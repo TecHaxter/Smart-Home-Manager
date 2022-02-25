@@ -1,10 +1,13 @@
-import 'dart:ui';
-
+import 'package:assets_audio_player/assets_audio_player.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:smart_home_manager/util/colors.dart';
-import 'package:smart_home_manager/widget/frostGlassBox.dart';
+import 'package:smart_home_manager/util/electricity_usage_data.dart';
+import 'package:smart_home_manager/util/music_sources.dart';
+import 'package:smart_home_manager/view/home/widget/frostGlassBox.dart';
+import 'package:smart_home_manager/view/home/widget/stats_bar.dart';
+import 'package:smart_home_manager/view/temperature/temperature.dart';
 
 class Home extends StatefulWidget {
   const Home({Key? key}) : super(key: key);
@@ -17,6 +20,48 @@ class _HomeState extends State<Home> {
   bool temperature = false;
   bool plugWall = false;
   bool smartTV = false;
+
+  PageController pageController = PageController();
+  final assetsAudioPlayer = AssetsAudioPlayer();
+  bool? isPlaying;
+  bool? isBuffering;
+
+  Future<void> loadMusic(index) async {
+    try {
+      await assetsAudioPlayer.open(
+        Audio.network(songs[index].musicUrl,
+            metas: Metas(
+                id: index.toString(),
+                title: songs[index].title,
+                artist: songs[index].artist,
+                image: MetasImage(
+                    path: songs[index].imageUrl!,
+                    type: songs[index].networkBased == true
+                        ? ImageType.network
+                        : ImageType.asset))),
+      );
+      await assetsAudioPlayer.pause();
+      assetsAudioPlayer.isBuffering.listen((event) {
+        print(event);
+        setState(() {
+          isBuffering = event;
+        });
+      });
+      assetsAudioPlayer.isPlaying.listen((event) {
+        setState(() {
+          isPlaying = event;
+        });
+      });
+    } catch (t) {
+      //mp3 unreachable
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    loadMusic(0);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -75,7 +120,7 @@ class _HomeState extends State<Home> {
                   const Text("Living Room",
                       style: TextStyle(
                           fontSize: 24,
-                          fontWeight: FontWeight.w300,
+                          fontWeight: FontWeight.w600,
                           color: Colors.white)),
                   const SizedBox(
                     height: 16,
@@ -87,6 +132,17 @@ class _HomeState extends State<Home> {
                         childWidth: 160,
                         childHeight: 220,
                         childSelected: temperature,
+                        navigationWidget: Temperature(
+                          title: "Living Room",
+                          description: "Home Temperature",
+                          switchStatus: temperature,
+                          updateSwitch: (val) {
+                            setState(() {
+                              temperature = val;
+                            });
+                          },
+                        ),
+                        parentContext: context,
                         childWidget: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -219,50 +275,69 @@ class _HomeState extends State<Home> {
                           childWidget: Column(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Container(
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        // image: const DecorationImage(
-                                        //     image: NetworkImage("url"),
-                                        //     fit: BoxFit.contain),
-                                        borderRadius:
-                                            BorderRadius.circular(12)),
-                                  ),
-                                  SizedBox(
-                                    width: 80,
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: const [
-                                        Text(
-                                          "Midnight love dfgsfg",
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(color: Colors.white),
+                              SizedBox(
+                                  width: double.maxFinite,
+                                  height: 40,
+                                  child: PageView.builder(
+                                    controller: pageController,
+                                    onPageChanged: (index) {
+                                      loadMusic(index);
+                                    },
+                                    physics:
+                                        const NeverScrollableScrollPhysics(),
+                                    itemCount: songs.length,
+                                    itemBuilder: (context, index) => Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Container(
+                                          width: 40,
+                                          decoration: BoxDecoration(
+                                              image: DecorationImage(
+                                                  image: NetworkImage(
+                                                      songs[index].imageUrl!),
+                                                  fit: BoxFit.cover),
+                                              borderRadius:
+                                                  BorderRadius.circular(12)),
                                         ),
-                                        Text(
-                                          "Girl in red",
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                              color: Colors.white70,
-                                              fontSize: 12),
-                                        ),
+                                        SizedBox(
+                                          width: 80,
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                songs[index].title,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                              Text(
+                                                songs[index].artist,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                    color: Colors.white70,
+                                                    fontSize: 12),
+                                              ),
+                                            ],
+                                          ),
+                                        )
                                       ],
                                     ),
-                                  )
-                                ],
-                              ),
+                                  )),
                               Row(
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
                                 children: [
                                   IconButton(
-                                    onPressed: () {},
+                                    onPressed: () {
+                                      pageController.previousPage(
+                                          duration:
+                                              const Duration(milliseconds: 500),
+                                          curve: Curves.easeIn);
+                                    },
                                     visualDensity: VisualDensity.compact,
                                     icon: const FaIcon(
                                       FontAwesomeIcons.stepBackward,
@@ -271,22 +346,40 @@ class _HomeState extends State<Home> {
                                     ),
                                   ),
                                   InkWell(
+                                    onTap: () {
+                                      isBuffering == false
+                                          ? assetsAudioPlayer.playOrPause()
+                                          : null;
+                                    },
                                     child: Container(
+                                      width: 45,
+                                      height: 45,
+                                      alignment: Alignment.center,
                                       padding: const EdgeInsets.all(12.0),
                                       decoration: BoxDecoration(
                                           borderRadius:
                                               BorderRadius.circular(16.0),
                                           color: Colors.white24),
-                                      child: const FaIcon(
-                                        FontAwesomeIcons.pause,
-                                        color: Colors.white,
-                                        size: 20,
-                                      ),
+                                      child: isBuffering == true
+                                          ? const CircularProgressIndicator(
+                                              color: Colors.white,
+                                              strokeWidth: 2.0,
+                                            )
+                                          : FaIcon(
+                                              isPlaying == true
+                                                  ? FontAwesomeIcons.pause
+                                                  : FontAwesomeIcons.play,
+                                              color: Colors.white,
+                                              size: 20,
+                                            ),
                                     ),
                                   ),
                                   IconButton(
                                     onPressed: () {
-                                      print("forward");
+                                      pageController.nextPage(
+                                          duration:
+                                              const Duration(milliseconds: 500),
+                                          curve: Curves.easeIn);
                                     },
                                     visualDensity: VisualDensity.compact,
                                     icon: const FaIcon(
@@ -366,7 +459,7 @@ class _HomeState extends State<Home> {
                       Text("Statistics",
                           style: TextStyle(
                               fontSize: 24,
-                              fontWeight: FontWeight.w300,
+                              fontWeight: FontWeight.w600,
                               color: Colors.white)),
                       Text("Month",
                           style: TextStyle(
@@ -379,9 +472,40 @@ class _HomeState extends State<Home> {
                     height: 16,
                   ),
                   FrostGlassBox(
-                      childWidth: double.maxFinite,
-                      childHeight: 250,
-                      childWidget: Container())
+                      childWidth: 350,
+                      childHeight: 200,
+                      childWidget: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: const [
+                              Text("Electricity Usage",
+                                  style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white)),
+                              Icon(
+                                Icons.arrow_forward_ios,
+                                color: Colors.white,
+                                size: 18,
+                              )
+                            ],
+                          ),
+                          Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                for (int i = 0;
+                                    i < electricityStats.height.length;
+                                    i++)
+                                  StatsBar(
+                                      height: electricityStats.height[i],
+                                      position: electricityStats.position[i],
+                                      increment: electricityStats.increment[i])
+                              ])
+                        ],
+                      ))
                 ],
               ),
             ),
